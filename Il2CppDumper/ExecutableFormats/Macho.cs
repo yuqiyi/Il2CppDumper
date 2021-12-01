@@ -51,7 +51,6 @@ namespace Il2CppDumper
                             section.offset = ReadUInt32();
                             Position += 12; //skip align, reloff, nreloc
                             section.flags = ReadUInt32();
-                            section.end = section.addr + section.size;
                             Position += 8; //skip reserved1, reserved2
                         }
                         break;
@@ -75,10 +74,20 @@ namespace Il2CppDumper
             customAttributeGenerators = customAttributeGenerators.Select(x => x - 1).ToArray();
         }
 
-        public override ulong MapVATR(ulong uiAddr)
+        public override ulong MapVATR(ulong addr)
         {
-            var section = sections.First(x => uiAddr >= x.addr && uiAddr <= x.end);
-            return uiAddr - (section.addr - section.offset);
+            var section = sections.First(x => addr >= x.addr && addr <= x.addr + x.size);
+            return addr - section.addr + section.offset;
+        }
+
+        public override ulong MapRTVA(ulong addr)
+        {
+            var section = sections.FirstOrDefault(x => addr >= x.offset && addr <= x.offset + x.size);
+            if (section == null)
+            {
+                return 0;
+            }
+            return addr - section.offset + section.addr;
         }
 
         public override bool Search()
@@ -167,16 +176,9 @@ namespace Il2CppDumper
 
         public override bool PlusSearch(int methodCount, int typeDefinitionsCount, int imageCount)
         {
-            var data = sections.Where(x => x.sectname == "__const").ToArray();
-            var code = sections.Where(x => x.flags == 0x80000400).ToArray();
-            var bss = sections.Where(x => x.flags == 1u).ToArray();
-
-            var plusSearch = new PlusSearch(this, methodCount, typeDefinitionsCount, maxMetadataUsages, imageCount);
-            plusSearch.SetSection(SearchSectionType.Exec, code);
-            plusSearch.SetSection(SearchSectionType.Data, data);
-            plusSearch.SetSection(SearchSectionType.Bss, bss);
-            var codeRegistration = plusSearch.FindCodeRegistration();
-            var metadataRegistration = plusSearch.FindMetadataRegistration();
+            var sectionHelper = GetSectionHelper(methodCount, typeDefinitionsCount, imageCount);
+            var codeRegistration = sectionHelper.FindCodeRegistration();
+            var metadataRegistration = sectionHelper.FindMetadataRegistration();
             return AutoPlusInit(codeRegistration, metadataRegistration);
         }
 
@@ -188,6 +190,18 @@ namespace Il2CppDumper
         public override ulong GetRVA(ulong pointer)
         {
             return pointer - vmaddr;
+        }
+
+        public override SectionHelper GetSectionHelper(int methodCount, int typeDefinitionsCount, int imageCount)
+        {
+            var data = sections.Where(x => x.sectname == "__const").ToArray();
+            var code = sections.Where(x => x.flags == 0x80000400).ToArray();
+            var bss = sections.Where(x => x.flags == 1u).ToArray();
+            var sectionHelper = new SectionHelper(this, methodCount, typeDefinitionsCount, maxMetadataUsages, imageCount);
+            sectionHelper.SetSection(SearchSectionType.Exec, code);
+            sectionHelper.SetSection(SearchSectionType.Data, data);
+            sectionHelper.SetSection(SearchSectionType.Bss, bss);
+            return sectionHelper;
         }
     }
 }

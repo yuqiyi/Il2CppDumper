@@ -14,7 +14,30 @@ namespace Il2CppDumper
             return addr;
         }
 
+        public override ulong MapRTVA(ulong addr)
+        {
+            return addr;
+        }
+
         public override bool PlusSearch(int methodCount, int typeDefinitionsCount, int imageCount)
+        {
+            var sectionHelper = GetSectionHelper(methodCount, typeDefinitionsCount, imageCount);
+            var codeRegistration = sectionHelper.FindCodeRegistration();
+            var metadataRegistration = sectionHelper.FindMetadataRegistration();
+            return AutoPlusInit(codeRegistration, metadataRegistration);
+        }
+
+        public override bool Search()
+        {
+            return false;
+        }
+
+        public override bool SymbolSearch()
+        {
+            return false;
+        }
+
+        public override SectionHelper GetSectionHelper(int methodCount, int typeDefinitionsCount, int imageCount)
         {
             var exec = new SearchSection
             {
@@ -37,23 +60,11 @@ namespace Il2CppDumper
                 address = Length,
                 addressEnd = long.MaxValue //hack
             };
-            var plusSearch = new PlusSearch(this, methodCount, typeDefinitionsCount, maxMetadataUsages, imageCount);
-            plusSearch.SetSection(SearchSectionType.Exec, exec);
-            plusSearch.SetSection(SearchSectionType.Data, data);
-            plusSearch.SetSection(SearchSectionType.Bss, bss);
-            var codeRegistration = plusSearch.FindCodeRegistration();
-            var metadataRegistration = plusSearch.FindMetadataRegistration();
-            return AutoPlusInit(codeRegistration, metadataRegistration);
-        }
-
-        public override bool Search()
-        {
-            return false;
-        }
-
-        public override bool SymbolSearch()
-        {
-            return false;
+            var sectionHelper = new SectionHelper(this, methodCount, typeDefinitionsCount, maxMetadataUsages, imageCount);
+            sectionHelper.SetSection(SearchSectionType.Exec, exec);
+            sectionHelper.SetSection(SearchSectionType.Data, data);
+            sectionHelper.SetSection(SearchSectionType.Bss, bss);
+            return sectionHelper;
         }
     }
 }

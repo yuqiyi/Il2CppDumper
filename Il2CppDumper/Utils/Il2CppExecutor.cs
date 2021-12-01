@@ -43,8 +43,11 @@ namespace Il2CppDumper
                 {
                     var imageDefName = metadata.GetStringFromIndex(imageDef.nameIndex);
                     var codeGenModule = il2Cpp.codeGenModules[imageDefName];
-                    var pointers = il2Cpp.ReadClassArray<ulong>(il2Cpp.MapVATR(codeGenModule.customAttributeCacheGenerator), imageDef.customAttributeCount);
-                    pointers.CopyTo(customAttributeGenerators, imageDef.customAttributeStart);
+                    if (imageDef.customAttributeCount > 0)
+                    {
+                        var pointers = il2Cpp.ReadClassArray<ulong>(il2Cpp.MapVATR(codeGenModule.customAttributeCacheGenerator), imageDef.customAttributeCount);
+                        pointers.CopyTo(customAttributeGenerators, imageDef.customAttributeStart);
+                    }
                 }
             }
             else
@@ -234,7 +237,7 @@ namespace Il2CppDumper
         public Il2CppRGCTXDefinition[] GetRGCTXDefinition(string imageName, Il2CppTypeDefinition typeDef)
         {
             Il2CppRGCTXDefinition[] collection = null;
-            if (il2Cpp.Version >= 24.2f)
+            if (il2Cpp.Version >= 24.2)
             {
                 il2Cpp.rgctxsDictionary[imageName].TryGetValue(typeDef.token, out collection);
             }
@@ -252,7 +255,7 @@ namespace Il2CppDumper
         public Il2CppRGCTXDefinition[] GetRGCTXDefinition(string imageName, Il2CppMethodDefinition methodDef)
         {
             Il2CppRGCTXDefinition[] collection = null;
-            if (il2Cpp.Version >= 24.2f)
+            if (il2Cpp.Version >= 24.2)
             {
                 il2Cpp.rgctxsDictionary[imageName].TryGetValue(methodDef.token, out collection);
             }
@@ -272,6 +275,10 @@ namespace Il2CppDumper
             if (il2Cpp.Version >= 27)
             {
                 var il2CppType = il2Cpp.GetIl2CppType(genericClass.type);
+                if (il2CppType == null)
+                {
+                    return null;
+                }
                 return GetTypeDefinitionFromIl2CppType(il2CppType);
             }
             if (genericClass.typeDefinitionIndex == 4294967295 || genericClass.typeDefinitionIndex == -1)
@@ -307,6 +314,11 @@ namespace Il2CppDumper
             {
                 return metadata.genericParameters[il2CppType.data.genericParameterIndex];
             }
+        }
+
+        public SectionHelper GetSectionHelper()
+        {
+            return il2Cpp.GetSectionHelper(metadata.methodDefs.Count(x => x.methodIndex >= 0), metadata.typeDefs.Length, metadata.imageDefs.Length);
         }
     }
 }

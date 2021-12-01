@@ -64,7 +64,17 @@ namespace Il2CppDumper
             {
                 return 0ul;
             }
-            return addr - (section.VirtualAddress - section.PointerToRawData);
+            return addr - section.VirtualAddress + section.PointerToRawData;
+        }
+
+        public override ulong MapRTVA(ulong addr)
+        {
+            var section = sections.FirstOrDefault(x => addr >= x.PointerToRawData && addr <= x.PointerToRawData + x.SizeOfRawData);
+            if (section == null)
+            {
+                return 0ul;
+            }
+            return addr - section.PointerToRawData + section.VirtualAddress + imageBase;
         }
 
         public override bool Search()
@@ -73,6 +83,24 @@ namespace Il2CppDumper
         }
 
         public override bool PlusSearch(int methodCount, int typeDefinitionsCount, int imageCount)
+        {
+            var sectionHelper = GetSectionHelper(methodCount, typeDefinitionsCount, imageCount);
+            var codeRegistration = sectionHelper.FindCodeRegistration();
+            var metadataRegistration = sectionHelper.FindMetadataRegistration();
+            return AutoPlusInit(codeRegistration, metadataRegistration);
+        }
+
+        public override bool SymbolSearch()
+        {
+            return false;
+        }
+
+        public override ulong GetRVA(ulong pointer)
+        {
+            return pointer - imageBase;
+        }
+
+        public override SectionHelper GetSectionHelper(int methodCount, int typeDefinitionsCount, int imageCount)
         {
             var execList = new List<SectionHeader>();
             var dataList = new List<SectionHeader>();
@@ -89,25 +117,13 @@ namespace Il2CppDumper
                         break;
                 }
             }
-            var plusSearch = new PlusSearch(this, methodCount, typeDefinitionsCount, maxMetadataUsages, imageCount);
+            var sectionHelper = new SectionHelper(this, methodCount, typeDefinitionsCount, maxMetadataUsages, imageCount);
             var data = dataList.ToArray();
             var exec = execList.ToArray();
-            plusSearch.SetSection(SearchSectionType.Exec, imageBase, exec);
-            plusSearch.SetSection(SearchSectionType.Data, imageBase, data);
-            plusSearch.SetSection(SearchSectionType.Bss, imageBase, data);
-            var codeRegistration = plusSearch.FindCodeRegistration();
-            var metadataRegistration = plusSearch.FindMetadataRegistration();
-            return AutoPlusInit(codeRegistration, metadataRegistration);
-        }
-
-        public override bool SymbolSearch()
-        {
-            return false;
-        }
-
-        public override ulong GetRVA(ulong pointer)
-        {
-            return pointer - imageBase;
+            sectionHelper.SetSection(SearchSectionType.Exec, imageBase, exec);
+            sectionHelper.SetSection(SearchSectionType.Data, imageBase, data);
+            sectionHelper.SetSection(SearchSectionType.Bss, imageBase, data);
+            return sectionHelper;
         }
     }
 }
